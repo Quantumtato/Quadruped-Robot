@@ -1,0 +1,176 @@
+#include <Wire.h>
+#include <EasyTransferI2C.h>
+//et shit
+EasyTransferI2C ET; 
+EasyTransferI2C ET2; 
+EasyTransferI2C ET3;
+EasyTransferI2C ET4;
+struct TOSLAVE1{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE1{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE1 slave1TX;
+FROMSLAVE1 slave1RX;
+struct TOSLAVE2{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE2{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE2 slave2TX;
+FROMSLAVE2 slave2RX;
+#define slave1address 2
+#define slave2address 3
+/////////////////////////////////
+int inangle1 = 0;
+int inangle2 = 0;
+int inangle3 = 0;
+int inangle4 = 0;
+int tally;
+int tally2;
+int tally3;
+int tally4;
+int encmax = 1500;
+///kinimatics vars
+ double posx = 176.39815; //positions in mm
+ double posy = 0.00;
+ double posz = 528.99807;
+ double xp;
+ double zp;
+ double r;
+ double setang = ((90.0-41.09015832)/180.00)*PI;
+ 
+ double ang[] = {0,0,0}; //define output angles 0-2 (radians)
+ double lengths[]= {202.05648,280.58114,673.96444}; //define leg lengths
+ double anglimit[] = {PI, PI, PI};
+//////
+
+void setup() {
+  Wire.begin(1); // join i2c bus (address optional for master)
+  Serial.begin(9600);
+    ET.begin(details(slave1TX), &Wire);
+    ET2.begin(details(slave1RX), &Wire);
+    ET3.begin(details(slave2TX), &Wire);
+    ET4.begin(details(slave2RX), &Wire);
+    Wire.onReceive(receive);
+}
+
+void kinematics(){
+  //////kinimatic calculations////////
+  ang[0]= atan(posy/posx);
+  xp=(posx/cos(ang[0])) - lengths[0]*sin(setang);
+  zp=posz - lengths[0]*cos(setang); //moving chordinate base to a 2d plane centered at the second joint
+  r = sq(xp) + sq(zp); //simplifying calculations
+  ang[2]=acos((sq(lengths[1]) + sq(lengths[2]) - (r))/(2*lengths[1]*lengths[2]));
+  //ang[1]= PI - ((atan(xp/zp) + atan((lengths[2]*sin(-1*(PI +ang[2])))/(lengths[1]+(lengths[2]*cos((PI +ang[2]))))))) + (PI/6);
+  //ang[1]= atan(xp/zp) - asin((sin(ang[2])*sqrt(r))/lengths[2]) + (PI/6);
+  ang[1]= -atan(xp/zp) - acos((sq(lengths[1])+ r - sq(lengths[2]))/(2*lengths[1]*sqrt(r))) + (setang); 
+  if(ang[1]<0){
+    ang[1]= PI +ang[1];
+   }
+  inangle2=map((ang[0]-0)*180.00/PI,-90,90,0,encmax);
+  inangle3=map((ang[1]*180.00/PI)-27.33560666,0,180,0,encmax);//posible type conversion errors
+  inangle4=map((ang[2]*180.00/PI)-6.98038965,0,180,0,encmax);
+
+  ///////printing/////////
+  for(int i = 0; i < 3; i = i+1){
+  Serial.print((ang[i]/PI)*180);
+  Serial.print("___");
+  Serial.println(i);  
+   }
+    Serial.println(inangle1);
+    Serial.println(inangle2);
+    Serial.println(inangle3);
+   delay(100);
+}
+void loop() {
+//read from serial user imput
+if(ET2.receiveData()){
+  tally = slave1RX.tally;
+  tally2 = slave1RX.tally2;
+  }else{}
+ if(ET4.receiveData()){
+  tally3 = slave2RX.tally;
+  tally4 = slave2RX.tally2;
+  }else{}
+  if(Serial.available()){
+    char cmd = Serial.read();
+    int serialBuffer = Serial.readString().toInt();
+    int serialTickAngle = serialBuffer;
+    switch(cmd){
+      case 'a':
+        inangle1 = serialTickAngle;
+        Serial.println("yes");
+        break;
+      case 'b':
+        inangle2 = serialTickAngle;
+        break;
+      case 'c':
+        inangle3 = serialTickAngle;
+        break;
+      case 'd':
+        inangle4 = serialTickAngle;
+        break;
+      case 'x':
+        posx = serialTickAngle;
+        break;
+      case 'y':
+        posy = serialTickAngle;
+        break;
+      case 'z':
+        posz = serialTickAngle;
+        break;
+      case 'k':
+        kinematics();
+        break;
+    }
+    
+  }
+  //transmitting
+  slave1TX.inangle=inangle1;
+  slave1TX.inangle2=inangle2;
+  ET.sendData(slave1address);
+  slave2TX.inangle=inangle3;
+  slave2TX.inangle2=inangle4;
+  //Serial.println(tally4);
+  ET3.sendData(slave2address);
+  Serial.print(inangle1);
+  Serial.println("__a");
+  Serial.print(inangle2);
+  Serial.println("__b");
+  Serial.print(inangle3);
+  Serial.println("__c");
+  Serial.print(inangle4);
+  Serial.println("__d");
+ /* 
+  Wire.beginTransmission(8); // transmit to device #8
+  Wire.write("a");
+  Wire.write(inangle1);
+  //Serial.println(inangle1);
+  Wire.write("b");
+  Wire.write(inangle2);
+  //Serial.println(inangle2);
+  Wire.endTransmission(6);    // stop transmitting
+  Wire.beginTransmission(16); // transmit to device #1
+  Wire.write("c");
+  Wire.write(inangle3);
+  //Serial.println(inangle3);
+  Wire.write("d");
+  Wire.write(inangle4);
+  //Serial.println(inangle4);
+  Wire.endTransmission();  
+*/
+  }
+  void receive(int numBytes) {}
