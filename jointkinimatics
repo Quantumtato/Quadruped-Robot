@@ -1,0 +1,78 @@
+#include <math.h>
+ double posx = 176.39815; //positions in mm
+ double posy = 0.00;
+ double posz = 528.99807;
+ double xp;
+ double zp;
+ double r;
+ double setang = ((90.0-41.09015832)/180.00)*PI;
+ 
+ double ang[] = {0,0,0}; //define output angles 0-2 (radians)
+
+ double lengths[]= {202.05648,280.58114,673.96444}; //define leg lengths
+
+float anglimit[] = {PI, PI, PI};
+ void setup() {
+  Serial.begin(9600);
+  pinMode(7, INPUT_PULLUP);
+  pinMode(8, INPUT_PULLUP);
+}
+
+
+ void kinematics(){
+  //////kinimatic calculations////////
+  ang[0]= atan(posy/posx);
+  xp=(posx/cos(ang[0])) - lengths[0]*sin(setang);
+  zp=posz - lengths[0]*cos(setang); //moving chordinate base to a 2d plane centered at the second joint
+  r = sq(xp) + sq(zp); //simplifying calculations
+  ang[2]=acos((sq(lengths[1]) + sq(lengths[2]) - (r))/(2*lengths[1]*lengths[2]));
+  //ang[1]= PI - ((atan(xp/zp) + atan((lengths[2]*sin(-1*(PI +ang[2])))/(lengths[1]+(lengths[2]*cos((PI +ang[2]))))))) + (PI/6);
+  //ang[1]= atan(xp/zp) - asin((sin(ang[2])*sqrt(r))/lengths[2]) + (PI/6);
+  ang[1]= -atan(xp/zp) - acos((sq(lengths[1])+ r - sq(lengths[2]))/(2*lengths[1]*sqrt(r))) + (setang); 
+  if(ang[1]<0){
+    ang[1]= PI +ang[1];
+   }
+  ///////printing/////////
+  for(int i = 0; i < 3; i = i+1){
+  Serial.print(i); 
+  Serial.print("___");
+  Serial.println(((ang[i]/PI)*180.00),14);
+   }
+   Serial.print("zp");
+   Serial.println(zp,4);
+   Serial.print("xp");
+   Serial.println(xp,4);
+   Serial.println(ang[2],4);
+  }
+void loop() {
+  // Check to make sure everything is ok
+  for(int i = 0; i < 3; i = i+1){
+    if(ang[i] >= anglimit[i]||digitalRead(7) == LOW||digitalRead(8) == LOW){
+      Serial.println("NOPE");
+      while(1);
+      }else{}
+ }
+  //////input/////
+  if(Serial.available() > 0){
+   if(Serial.available()){
+    char cmd = Serial.read();
+    float serialBuffer = Serial.readString().toFloat();
+    float serialTickAngle = serialBuffer;
+    switch(cmd){
+      case 'x':
+        posx = serialTickAngle;
+        break;
+      case 'y':
+        posy = serialTickAngle;
+        break;
+      case 'z':
+        posz = serialTickAngle;
+        break;
+      case 'c':
+        kinematics();
+        break;
+      }
+  }
+}
+  delay(10);
+}
