@@ -1,0 +1,200 @@
+#include <Wire.h>
+#include <PID_v1.h>
+#include <EasyTransferI2C.h>
+
+//et shit
+EasyTransferI2C ET; //et object
+EasyTransferI2C ET2;
+struct TOSLAVE2{
+  //put your variable definitions here for the data you want to receive
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+  int16_t inangle;
+  int16_t inangle2;
+};
+struct FROMSLAVE2{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+  int16_t tally;
+  int16_t tally2;
+};
+TOSLAVE2 slave2TX;
+FROMSLAVE2 slave2RX;
+#define I2C_SLAVE_ADDRESS 3
+#define masteraddress 1
+boolean send2 = false; //todo
+
+
+////pid1 shit
+double Pk1 = 10;  //proportional
+double Ik1 = 5;  //integral
+double Dk1 = 0;  //deriviative
+boolean dirr;  //direction
+volatile int tally = 0;
+int limitpin = 4;
+int inangle = 0;
+float gearing = 755/180.0;
+double Setpoint1, Input1, Output1, Output1a;  // PID variables
+
+PID PID1(&Input1, &Output1, &Setpoint1, Pk1, Ik1 , Dk1, DIRECT); 
+
+
+
+////pid2 shit
+double Pk2 = 10;  //
+double Ik2 = 5;  //integral
+double Dk2 = 1;  //derivitave
+boolean dirr2;  //direction
+volatile int tally2 = 3;
+int limitpin2 = 7;
+int inangle2;
+
+float gearing2 = 755/180.0;
+double Setpoint2, Input2, Output2, Output2a;  // PID variables
+
+PID PID2(&Input2, &Output2, &Setpoint2, Pk2, Ik2 , Dk2, DIRECT); 
+
+
+
+void setup() {
+  //I2C setup
+  Wire.begin(I2C_SLAVE_ADDRESS);                // join i2c bus with address #8
+  ET.begin(details(slave2TX), &Wire);
+  ET2.begin(details(slave2RX), &Wire);
+  Wire.onReceive(receive);
+  //joint1 set up
+   pinMode(2, INPUT); //PIN 2 is the encoder reader
+  pinMode(limitpin, INPUT); //LIMIT PIN is whether it is at the zero position (fully down)
+                            //^ UNIMPLEMENTED YET
+  attachInterrupt(digitalPinToInterrupt(2), counter, CHANGE); //ticks counter every encoder moment
+
+  Serial.begin(9600);
+  //setup PID
+  PID1.SetMode(AUTOMATIC);              // PID Setup - trousers SERVO
+  PID1.SetOutputLimits(-255, 255);
+  PID1.SetSampleTime(8);
+
+  //joint2 setup
+
+   pinMode(3, INPUT); //PIN 3 is the encoder reader
+  pinMode(limitpin2, INPUT); //LIMIT PIN is whether it is at the zero position (fully down)
+                            //^ UNIMPLEMENTED YET
+  attachInterrupt(digitalPinToInterrupt(3), counter2, CHANGE); //ticks counter every encoder moment
+
+  //setup PID2
+  PID2.SetMode(AUTOMATIC);              // PID Setup - trousers SERVO
+  PID2.SetOutputLimits(-255, 255);
+  PID2.SetSampleTime(8);
+  homing();
+}
+
+
+void counter(){
+  if (dirr) {
+    tally ++;
+  }
+  else if (!dirr) {
+    tally --;
+  }
+}
+
+void counter2(){
+  if (dirr2) {
+    tally2 ++;
+  }
+  else if (!dirr2) {
+    tally2 --;
+  }
+}
+
+
+void loop() {
+  //limit
+  if(digitalRead(limitpin)==1){
+    tally = 0;
+    }
+    if(digitalRead(limitpin2)==1){
+      tally2=0;
+      }
+  //Et
+  if(send2=true){
+  slave2RX.tally = tally;
+  slave2RX.tally2 = tally2;
+   ET2.sendData(masteraddress);
+  }
+
+  if(ET.receiveData()){
+    inangle = slave2TX.inangle;
+    inangle2 = slave2TX.inangle2;
+    //Serial.println("dank");
+    //Serial.println(inangle2);
+    }
+  
+  
+ Setpoint1 = map(inangle,-gearing*180,gearing*180,-255,255);
+  Input1 = map(tally,-gearing*180,gearing*180,-255,255);
+  PID1.Compute();
+  Serial.print("c__");
+  Serial.print(tally);
+  Serial.print("->");
+  Serial.print(inangle);
+  Serial.print(" : ");
+  Serial.print(Output1);
+  Serial.print("  d__");
+  Serial.print(tally2);
+  Serial.print("->");
+  Serial.print(inangle2);
+  Serial.print(" : ");
+  Serial.println(Output2);
+
+  
+  if (Output1 > 0) {
+    analogWrite(5, Output1);
+    analogWrite(6, 0);
+    dirr = true;
+  }
+  else if (Output1 < 0) {
+    Output1a = abs(Output1);
+    analogWrite(5, 0);
+    analogWrite(6, Output1a);
+    dirr = false;
+  }
+
+
+
+  Setpoint2 = map(inangle2,-gearing*180,gearing*180,-255,255);
+  Input2 = map(tally2,-gearing*180,gearing*180,-255,255);
+  PID2.Compute();
+
+  if (Output2 > 0) {
+    analogWrite(9, Output2);
+    analogWrite(10, 0);
+    dirr2 = true;
+  }
+  else if (Output2 < 0) {
+    Output2a = abs(Output2);
+    analogWrite(9, 0);
+    analogWrite(10, Output2a);
+    dirr2 = false;
+  }
+}
+void homing(){
+  /////limit switch code////if wrong switch which pin gives pwm
+  while(digitalRead(limitpin)==0){
+    analogWrite(6, 255);
+    analogWrite(5, 0);
+    Serial.println("homing1");
+    Serial.println(digitalRead(limitpin));
+    }
+    tally=0;
+    analogWrite(6, 0);
+    analogWrite(5, 0);
+  while(digitalRead(limitpin2)==0){
+    analogWrite(10, 255);
+    analogWrite(9, 0);
+    Serial.println("homing2");
+    Serial.println(digitalRead(limitpin2));
+    }
+    tally2=0;
+    analogWrite(9, 0);
+    analogWrite(10, 0);}
+void receive(int numBytes) {}
