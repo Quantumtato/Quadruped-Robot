@@ -1,0 +1,312 @@
+#include <Wire.h>
+#include <EasyTransferI2C.h>
+//et shit
+EasyTransferI2C TS1; //transmit slave 1
+EasyTransferI2C RS1; //recive slave1
+EasyTransferI2C TS2;
+EasyTransferI2C RS2;
+EasyTransferI2C TS3; 
+EasyTransferI2C RS3; 
+EasyTransferI2C TS4;
+EasyTransferI2C RS4;
+EasyTransferI2C TS5; 
+EasyTransferI2C RS5; 
+EasyTransferI2C TS6;
+EasyTransferI2C RS6;
+///////slave1
+struct TOSLAVE1{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE1{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE1 slave1TX;
+FROMSLAVE1 slave1RX;
+#define slave1address 2
+struct TOSLAVE2{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE2{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE2 slave2TX;
+FROMSLAVE2 slave2RX;
+#define slave2address 3
+///////slave3
+struct TOSLAVE3{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE3{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE3 slave3TX;
+FROMSLAVE3 slave3RX;
+#define slave3address 4
+///////slave4
+struct TOSLAVE4{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE4{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE4 slave4TX;
+FROMSLAVE4 slave4RX;
+#define slave4address 5
+///////slave5
+struct TOSLAVE5{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE5{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE5 slave5TX;
+FROMSLAVE5 slave5RX;
+#define slave5address 6
+///////slave6
+struct TOSLAVE6{
+  //put your variable definitions here for the data you want to send
+  //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
+   int16_t inangle;
+   int16_t inangle2;
+};
+struct FROMSLAVE6{
+    int16_t tally;
+    int16_t tally2;
+  };
+//give a name to the group of data
+TOSLAVE6 slave6TX;
+FROMSLAVE6 slave6RX;
+#define slave6address 7
+/////////////////////////////////
+double input[6];//base positions x,y,z,rotx,roty,rotz
+int inangle[4][3]= {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+int tally[4][3]= {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+int encmax = 1500;
+double baseoffset[3]={0,0,0}; //distance from leg center to base center xyz
+double currentlegpos[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+///kinimatics vars
+ double posx = 176.39815; //positions in mm
+ double posy = 0.00;
+ double posz = 528.99807;
+ double setang = ((90.0-41.09015832)/180.00)*PI;
+ double ang[] = {0,0,0}; //define output angles 0-2 (radians)
+ double lengths[]= {202.05648,280.58114,673.96444}; //define leg lengths
+ double anglimit[] = {PI, PI, PI};
+ double legpos [4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+/////
+
+////
+
+void rotatevec(double vector[3],double input[6]){
+  double output[3];
+  for(int i=4;i<7;i++){
+  input[i] = input[i]*PI/180;//convert to radians
+  }
+
+  
+  double rotx[3][3]={{1 ,       0    ,     0          },//U L T I M A T E   R E A D A B I L I T Y
+                    {0,cos(input[4]),-1*sin(input[4])},
+                    {0,sin(input[4]),cos(input[4])}};
+  double roty[3][3]={{cos(input[5]),0,sin(input[5])},
+                    {0,1,0},
+                    {-1*sin(input[5]),0,cos(input[5])}};
+  double rotz[3][3]={{cos(input[6]),-1*sin(input[6]),0},
+                    {sin(input[6]),cos(input[6]),0},
+                    {0,0,1}};
+  for(int k; k<3;k++){
+    for(int l; l<3;l++){
+      //rotx*roty*rotz*input = output
+    }
+
+  //return new vector
+  }
+
+void setup() {
+  Wire.begin(1); // join i2c bus (address optional for master)
+  Serial.begin(9600);
+    TS1.begin(details(slave1TX), &Wire);
+    RS1.begin(details(slave1RX), &Wire);
+    TS2.begin(details(slave2TX), &Wire);
+    RS2.begin(details(slave2RX), &Wire);
+    TS3.begin(details(slave3TX), &Wire);
+    RS3.begin(details(slave3RX), &Wire);
+    TS4.begin(details(slave4TX), &Wire);
+    RS4.begin(details(slave4RX), &Wire);
+    TS5.begin(details(slave5RX), &Wire);
+    RS5.begin(details(slave5TX), &Wire);
+    TS6.begin(details(slave6RX), &Wire);
+    RS6.begin(details(slave6TX), &Wire);    
+    Wire.onReceive(receive);
+}
+
+double kinematics(double pos[3], int i) {
+  double x = pos[0];
+  double y = pos[1];
+  double z = pos[2];
+  //dumb vars 
+  double zp,xp,r;
+  double theta[3] = {0,0,0};
+  theta[0]= atan(y/x);//simple calc for base angle
+  zp=z - lengths[0]*cos(setang); //moving chordinate base to a 2d plane centered at the second joint
+  xp=(posx/cos(theta[0])) - lengths[0]*sin(setang);//same as above for x
+  r = sq(xp) + sq(zp); //simplifying calculations
+  theta[2]=acos((sq(lengths[1]) + sq(lengths[2]) - (r))/(2*lengths[1]*lengths[2])); 
+  theta[1]= -atan(xp/zp) - acos((sq(lengths[1])+ r - sq(lengths[2]))/(2*lengths[1]*sqrt(r))) + (setang);
+  if(theta[1]<0){ //compensating for trig weirdness
+    theta[1]= PI +ang[1];
+   }
+  theta[0]=map((theta[0]-0)*180.00/PI,-90,90,0,encmax); //scaling from angles to encoder vals
+  theta[1]=map((ang[1]*180.00/PI)-27.33560666,0,180,0,encmax);//posible type conversion errors
+  theta[2]=map((ang[2]*180.00/PI)-6.98038965,0,180,0,encmax);//numbers are offsets from the geometry 
+
+  return theta[i];
+}
+
+void loop() {
+  ///////////////actual math incoming//////////
+  for(int i; i<4;i++){
+      for(int j; j<3;j++){
+        legpos[i][j]= currentlegpos[i][j] -input[j]; //cartisian base chords
+        currentlegpos[i][j] = legpos[i][j]; ///fix later, sets current to predicted, update with adding readings from slaves
+      }
+    }
+ 
+  
+
+//////////change chord systems to legs
+for(int i = 0; i <4;i++){
+  legpos[i][2]=legpos[i][2] - baseoffset[2];//z offset change chord system to leg based chord sys
+  }
+  int sign = 1;
+for(int i = 0; i <4;i++){
+  legpos[i][1]= sign*(legpos[i][1] - baseoffset[1]);//y offset
+  if(i >= 2){
+    sign = -1;
+    }
+}
+  sign = -1;
+for(int i = 0; i <4;i++){
+  legpos[i][0]=sign*(legpos[i][0] - baseoffset[0]);//x offset
+  sign = -1*sign;// offsets
+}
+
+///////////////////set actual angles for legs with leg kinimatics method
+for(int j=0; j < 4; j++){
+  for(int i=0; i < 3; i++){
+ inangle[j][i] = kinematics(legpos[j],i);
+}}
+////////dumb arduino transfer from here down/////////
+//read from serial user imput
+if(RS1.receiveData()){//slaves 1 and 2 are the arduinos on top, they control the base joints
+  tally[0][0] = slave1RX.tally;
+  tally[1][0] = slave1RX.tally2;
+  }else{}
+ if(RS2.receiveData()){
+  tally[2][0] = slave2RX.tally;
+  tally[3][0] = slave2RX.tally2;
+  }else{}
+  if(RS3.receiveData()){
+  tally[0][1] = slave1RX.tally;
+  tally[0][2] = slave1RX.tally2;
+  }else{}
+ if(RS4.receiveData()){
+  tally[1][1] = slave2RX.tally;
+  tally[1][2] = slave2RX.tally2;
+  }else{}
+  if(RS5.receiveData()){
+  tally[2][1] = slave1RX.tally;
+  tally[2][2] = slave1RX.tally2;
+  }else{}
+ if(RS6.receiveData()){
+  tally[3][1] = slave2RX.tally;
+  tally[3][2] = slave2RX.tally2;
+  }else{}
+  if(Serial.available()){
+    char cmd = Serial.read();
+    int serialBuffer = Serial.readString().toInt();
+    int serialTickAngle = serialBuffer;
+    switch(cmd){
+      case 'a':
+        inangle[0][0] = serialTickAngle;
+        Serial.println("yes");
+        break;
+      case 'b':
+        inangle[0][1] = serialTickAngle;
+        break;
+      case 'c':
+        inangle[0][2] = serialTickAngle;
+        break;
+      case 'd':
+        inangle[1][3] = serialTickAngle;
+        break;
+      case 'x':
+        posx = serialTickAngle;
+        break;
+      case 'y':
+        posy = serialTickAngle;
+        break;
+      case 'z':
+        posz = serialTickAngle;
+        break;
+      case 'k':
+        //kinematics1();
+        break;
+    }
+    
+  }
+  //transmitting
+  slave1TX.inangle=inangle[0][0];
+  slave1TX.inangle2=inangle[1][0];
+  TS1.sendData(slave1address);
+  slave2TX.inangle=inangle[2][0];
+  slave2TX.inangle2=inangle[3][0];
+  TS2.sendData(slave2address);
+  slave1TX.inangle=inangle[0][1];
+  slave1TX.inangle2=inangle[0][2];
+  TS3.sendData(slave3address);
+  slave2TX.inangle=inangle[1][1];
+  slave2TX.inangle2=inangle[1][2];
+  TS4.sendData(slave4address);
+  slave1TX.inangle=inangle[2][1];
+  slave1TX.inangle2=inangle[2][2];
+  TS5.sendData(slave5address);
+  slave2TX.inangle=inangle[3][1];
+  slave2TX.inangle2=inangle[3][2];
+  TS6.sendData(slave6address);
+
+  
+  Serial.print(inangle[0][0]);//todo reformat printing
+  Serial.println("__a");
+  Serial.print(inangle[0][1]);
+  Serial.println("__b");
+  Serial.print(inangle[0][2]);
+  Serial.println("__c");
+  Serial.print(inangle[1][3]);
+  Serial.println("__d");
+  }
+  void receive(int numBytes) {}
