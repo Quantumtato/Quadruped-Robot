@@ -1,5 +1,11 @@
+#include <Servo.h>
+Servo base;
+Servo elbow;
+Servo wrist;
 #include <Wire.h>
 #include <EasyTransferI2C.h>
+ int temp =0;
+ boolean down = false;
 //et shit
 EasyTransferI2C TS1; //transmit slave 1
 EasyTransferI2C RS1; //recive slave1
@@ -28,6 +34,8 @@ struct FROMSLAVE1{
 TOSLAVE1 slave1TX;
 FROMSLAVE1 slave1RX;
 #define slave1address 2
+boolean send1 = false;
+//////slave2
 struct TOSLAVE2{
   //put your variable definitions here for the data you want to send
   //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
@@ -42,6 +50,7 @@ struct FROMSLAVE2{
 TOSLAVE2 slave2TX;
 FROMSLAVE2 slave2RX;
 #define slave2address 3
+boolean send2 = false;
 ///////slave3
 struct TOSLAVE3{
   //put your variable definitions here for the data you want to send
@@ -57,6 +66,7 @@ struct FROMSLAVE3{
 TOSLAVE3 slave3TX;
 FROMSLAVE3 slave3RX;
 #define slave3address 4
+boolean send3 = false;
 ///////slave4
 struct TOSLAVE4{
   //put your variable definitions here for the data you want to send
@@ -72,6 +82,7 @@ struct FROMSLAVE4{
 TOSLAVE4 slave4TX;
 FROMSLAVE4 slave4RX;
 #define slave4address 5
+boolean send4 = false;
 ///////slave5
 struct TOSLAVE5{
   //put your variable definitions here for the data you want to send
@@ -87,12 +98,14 @@ struct FROMSLAVE5{
 TOSLAVE5 slave5TX;
 FROMSLAVE5 slave5RX;
 #define slave5address 6
+boolean send5 = false;
 ///////slave6
 struct TOSLAVE6{
   //put your variable definitions here for the data you want to send
   //THIS MUST BE EXACTLY THE SAME ON THE OTHER ARDUINO
    int16_t inangle;
    int16_t inangle2;
+   boolean send6;
 };
 struct FROMSLAVE6{
     int16_t tally;
@@ -102,22 +115,25 @@ struct FROMSLAVE6{
 TOSLAVE6 slave6TX;
 FROMSLAVE6 slave6RX;
 #define slave6address 7
+boolean send6 = false;
+
+int m = 0;
+boolean trans = false;
 /////////////////////////////////
 double input[6];//base positions x,y,z,rotx,roty,rotz
-int inangle[4][3]= {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+int inangle[4][3]= {{0,0,0},{0,50,0},{0,0,0},{0,0,0}};
 int tally[4][3]= {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
-int encmax = 1500;
+double encmax = 1500;
 double baseoffset[3]={0,0,0}; //distance from leg center to base center xyz
-double currentlegpos[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+double currentlegpos[4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};//currently not used
 ///kinimatics vars
- double posx = 176.39815; //positions in mm
- double posy = 0.00;
- double posz = 528.99807;
+
  double setang = ((90.0-41.09015832)/180.00)*PI;
- double ang[] = {0,0,0}; //define output angles 0-2 (radians)
+
  double lengths[]= {202.05648,280.58114,673.96444}; //define leg lengths
  double anglimit[] = {PI, PI, PI};
- double legpos [4][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+ double legpos [4][3] = {{50,50,600},{500,500,600},{50,50,600},{50,50,600}};
+ boolean kin = false;
 /////
 
 ////
@@ -144,9 +160,12 @@ void rotatevec(double vector[3],double input[6]){
     }
 
   //return new vector
-  }
+  }}
 
 void setup() {
+  elbow.attach(10);
+  base.attach(9);
+  wrist.attach(12);
   Wire.begin(1); // join i2c bus (address optional for master)
   Serial.begin(9600);
     TS1.begin(details(slave1TX), &Wire);
@@ -157,39 +176,67 @@ void setup() {
     RS3.begin(details(slave3RX), &Wire);
     TS4.begin(details(slave4TX), &Wire);
     RS4.begin(details(slave4RX), &Wire);
-    TS5.begin(details(slave5RX), &Wire);
-    RS5.begin(details(slave5TX), &Wire);
-    TS6.begin(details(slave6RX), &Wire);
-    RS6.begin(details(slave6TX), &Wire);    
+    TS5.begin(details(slave5TX), &Wire);
+    RS5.begin(details(slave5RX), &Wire);
+    TS6.begin(details(slave6TX), &Wire);
+    RS6.begin(details(slave6RX), &Wire);    
     Wire.onReceive(receive);
 }
 
-double kinematics(double pos[3], int i) {
-  double x = pos[0];
-  double y = pos[1];
-  double z = pos[2];
+double kinematics(double pos[3], int i, int leg) {
+  int right,bottom;
+  switch (leg){
+  case 0://discribing views of robot from top with arduino on top
+    bottom = 0;
+    right = 0;
+   break;
+   case 1:
+   bottom = 0;
+    right = 1;
+   break;
+   case 2:
+   bottom = 1;
+    right = 1;
+   break;
+   case 3:
+   bottom = 1;
+    right = 0;
+   break;
+  }
+  double x =  pos[0] - 59.21067* pow(-1,bottom);
+  double y =  (pos[1] -68.8618*pow(-1,right+1))* pow(-1,right+1);
+  double z = pos[2] - 25.49349;
+   
   //dumb vars 
   double zp,xp,r;
   double theta[3] = {0,0,0};
-  theta[0]= atan(y/x);//simple calc for base angle
+  theta[0]= atan(x/y);//simple calc for base angle
   zp=z - lengths[0]*cos(setang); //moving chordinate base to a 2d plane centered at the second joint
-  xp=(posx/cos(theta[0])) - lengths[0]*sin(setang);//same as above for x
+  xp=(y/cos(theta[0])) - lengths[0]*sin(setang);//same as above for x
   r = sq(xp) + sq(zp); //simplifying calculations
-  theta[2]=acos((sq(lengths[1]) + sq(lengths[2]) - (r))/(2*lengths[1]*lengths[2])); 
+  theta[2]=-acos((sq(lengths[1]) + sq(lengths[2]) - (r))/(2*lengths[1]*lengths[2]));
   theta[1]= -atan(xp/zp) - acos((sq(lengths[1])+ r - sq(lengths[2]))/(2*lengths[1]*sqrt(r))) + (setang);
+  
   if(theta[1]<0){ //compensating for trig weirdness
-    theta[1]= PI +ang[1];
+    theta[1]= PI +theta[1];
    }
-  theta[0]=map((theta[0]-0)*180.00/PI,-90,90,0,encmax); //scaling from angles to encoder vals
-  theta[1]=map((ang[1]*180.00/PI)-27.33560666,0,180,0,encmax);//posible type conversion errors
-  theta[2]=map((ang[2]*180.00/PI)-6.98038965,0,180,0,encmax);//numbers are offsets from the geometry 
-
+   
+  theta[1] =  theta[1] -(8.42576498)*PI/180.0;
+  theta[2] = -1*(theta[2] +(6.98038965*PI/180.0)); //offsets for wire geometry
+  
+  theta[0] = theta[0] -PI/2*pow(-1,bottom); //for setting off the limit
+  theta[0]=(theta[0]/PI)*encmax; //scaling from angles to encoder vals
+  theta[1]=(theta[1]/PI)*encmax;//posible type conversion errors
+  theta[2]=(theta[2]/PI)*encmax;//numbers are offsets from the geometry 
+  if(bottom == 0){
+    theta[0] = -theta[0];
+    }
   return theta[i];
 }
 
 void loop() {
   ///////////////actual math incoming//////////
-  for(int i; i<4;i++){
+ /* for(int i; i<4;i++){
       for(int j; j<3;j++){
         legpos[i][j]= currentlegpos[i][j] -input[j]; //cartisian base chords
         currentlegpos[i][j] = legpos[i][j]; ///fix later, sets current to predicted, update with adding readings from slaves
@@ -213,16 +260,18 @@ for(int i = 0; i <4;i++){
 for(int i = 0; i <4;i++){
   legpos[i][0]=sign*(legpos[i][0] - baseoffset[0]);//x offset
   sign = -1*sign;// offsets
-}
+}*/
 
 ///////////////////set actual angles for legs with leg kinimatics method
-for(int j=0; j < 4; j++){
+for(int j=1; j < 2; j++){//edit to 0, 4
   for(int i=0; i < 3; i++){
- inangle[j][i] = kinematics(legpos[j],i);
+    if(kin == true){
+  inangle[j][i] = kinematics(legpos[j],i,j);
+    }
 }}
 ////////dumb arduino transfer from here down/////////
 //read from serial user imput
-if(RS1.receiveData()){//slaves 1 and 2 are the arduinos on top, they control the base joints
+if(RS1.receiveData()){//slaves 1 and 2 are the arduinos on bottom, they control the base joints
   tally[0][0] = slave1RX.tally;
   tally[1][0] = slave1RX.tally2;
   }else{}
@@ -231,21 +280,27 @@ if(RS1.receiveData()){//slaves 1 and 2 are the arduinos on top, they control the
   tally[3][0] = slave2RX.tally2;
   }else{}
   if(RS3.receiveData()){
-  tally[0][1] = slave1RX.tally;
-  tally[0][2] = slave1RX.tally2;
+  tally[0][1] = slave3RX.tally;
+  tally[0][2] = slave3RX.tally2;
   }else{}
  if(RS4.receiveData()){
-  tally[1][1] = slave2RX.tally;
-  tally[1][2] = slave2RX.tally2;
+  tally[1][1] = slave4RX.tally;
+  tally[1][2] = slave4RX.tally2;
   }else{}
   if(RS5.receiveData()){
-  tally[2][1] = slave1RX.tally;
-  tally[2][2] = slave1RX.tally2;
+  tally[2][1] = slave5RX.tally;
+  tally[2][2] = slave5RX.tally2;
   }else{}
  if(RS6.receiveData()){
-  tally[3][1] = slave2RX.tally;
-  tally[3][2] = slave2RX.tally2;
+  tally[3][1] = slave6RX.tally;
+  tally[3][2] = slave6RX.tally2;
+  //if(m>9){
+    //m =0;
+    //send6=false;
+    //}
+  Serial.println(tally[3][2]);
   }else{}
+  
   if(Serial.available()){
     char cmd = Serial.read();
     int serialBuffer = Serial.readString().toInt();
@@ -253,60 +308,123 @@ if(RS1.receiveData()){//slaves 1 and 2 are the arduinos on top, they control the
     switch(cmd){
       case 'a':
         inangle[0][0] = serialTickAngle;
-        Serial.println("yes");
         break;
       case 'b':
-        inangle[0][1] = serialTickAngle;
+        inangle[1][0] = serialTickAngle;
         break;
       case 'c':
-        inangle[0][2] = serialTickAngle;
+        inangle[2][0] = serialTickAngle;
         break;
       case 'd':
-        inangle[1][3] = serialTickAngle;
+        inangle[3][0] = serialTickAngle;
         break;
-      case 'x':
-        posx = serialTickAngle;
+      case 'e':
+        inangle[0][1] = serialTickAngle;
         break;
-      case 'y':
-        posy = serialTickAngle;
+      case 'f':
+        inangle[0][2] = serialTickAngle;
         break;
-      case 'z':
-        posz = serialTickAngle;
+      case 'g':
+        inangle[1][1] = serialTickAngle;
+        break;
+      case 'h':
+        inangle[1][2] = serialTickAngle;
+        break;
+      case 'i':
+        inangle[2][1] = serialTickAngle;
+        break;
+      case 'j':
+        inangle[2][2] = serialTickAngle;
         break;
       case 'k':
-        //kinematics1();
+        inangle[3][1] = serialTickAngle;
+        break;
+      case 'l':
+        inangle[3][2] = serialTickAngle;
+        break;
+      case 'x':
+        legpos[1][0] = serialTickAngle;
+        break;
+      case 'y':
+        legpos[1][1] = serialTickAngle;
+        break;
+      case 'z':
+        legpos[1][2] = serialTickAngle;
+        break;
+      case '.':
+        kin = !kin;
         break;
     }
     
   }
+  legpos[1][1] = temp;//write leg 1 in a line in the y
+  Serial.println(temp);
+  //if(!trans){//if any slave is transmitting stop sending shit
   //transmitting
-  slave1TX.inangle=inangle[0][0];
-  slave1TX.inangle2=inangle[1][0];
+  slave1TX.inangle=inangle[0][0];//a
+  slave1TX.inangle2=inangle[1][0];//b
+  base.write(inangle[1][0]*180/1500);
   TS1.sendData(slave1address);
-  slave2TX.inangle=inangle[2][0];
-  slave2TX.inangle2=inangle[3][0];
+  slave2TX.inangle=inangle[2][0];//c
+  slave2TX.inangle2=inangle[3][0];//d
   TS2.sendData(slave2address);
-  slave1TX.inangle=inangle[0][1];
-  slave1TX.inangle2=inangle[0][2];
+  slave3TX.inangle=inangle[0][1];//e
+  slave3TX.inangle2=inangle[0][2];//f
   TS3.sendData(slave3address);
-  slave2TX.inangle=inangle[1][1];
-  slave2TX.inangle2=inangle[1][2];
+  slave4TX.inangle=inangle[1][1];//g
+  slave4TX.inangle2=inangle[1][2];//h
+  elbow.write(inangle[1][1]*180/1500);
+  wrist.write(inangle[1][2]*180/1500);
   TS4.sendData(slave4address);
-  slave1TX.inangle=inangle[2][1];
-  slave1TX.inangle2=inangle[2][2];
+  slave5TX.inangle=inangle[2][1];//i
+  slave5TX.inangle2=inangle[2][2];//j
   TS5.sendData(slave5address);
-  slave2TX.inangle=inangle[3][1];
-  slave2TX.inangle2=inangle[3][2];
+  slave6TX.inangle=inangle[3][1];//k
+  slave6TX.inangle2=inangle[3][2];//l
+  slave6TX.send6=send6;
   TS6.sendData(slave6address);
 
-  
-  Serial.print(inangle[0][0]);//todo reformat printing
-  Serial.println("__a");
-  Serial.print(inangle[0][1]);
-  Serial.println("__b");
-  Serial.print(inangle[0][2]);
-  Serial.println("__c");
-  Serial.print(inangle[1][3]);
-  Serial.println("__d");
+  ///printing
+  Serial.print("a: ");
+  Serial.print(inangle[0][0]);
+  Serial.print("    b: ");
+  Serial.print(inangle[1][0]);
+  Serial.print("    c: ");
+  Serial.print(inangle[2][0]);
+  Serial.print("    d: ");
+  Serial.print(inangle[3][0]);
+ Serial.print("    e: ");
+Serial.print(inangle[0][1]);
+ Serial.print("    f: ");
+ Serial.print(inangle[0][2]);
+  Serial.print("    g: ");
+  Serial.print(inangle[1][1]);
+  Serial.print("    h: ");
+  Serial.print(inangle[1][2]);
+Serial.print("    i: ");
+ Serial.print(inangle[2][1]);
+ Serial.print("    j: ");
+ Serial.print(inangle[2][2]);
+ Serial.print("    k: ");
+ Serial.print(inangle[3][1]);
+  Serial.print("    l: ");
+  Serial.println(inangle[3][2]); // works for static pos for all 4 legs as of 7/01/19
+ delay(10);
+ if(down ==true){
+  temp--;
+  }else{temp++;}
+ 
+ if(temp>500){
+    temp= 700;
+    down = true;
   }
+  if(temp<-500){
+    temp= 500;
+    down = false;
+  }
+  //}
+//trans = !(!send6/*||!send1||!send2...*/);
+  }
+
+  
   void receive(int numBytes) {}
